@@ -44,6 +44,11 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.ApiConfig
 import com.example.data.UsageLog
 import com.example.network.ModelPricing
+import com.example.widget.BudgetNotificationHelper
+import com.example.widget.MonitorWidgetProvider
+import android.content.Intent
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.vector.ImageVector
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -57,6 +62,58 @@ fun MonitorScreen(
     val focusManager = LocalFocusManager.current
 
     val isUserLoggedIn = uiState.config.isDemoMode || uiState.config.apiKey.isNotEmpty()
+
+    val context = LocalContext.current
+    val totalCost = remember(uiState.logs) { uiState.logs.sumOf { it.cost } }
+    val budget = uiState.config.monthlyBudget
+
+    // 1. Broadcast updates to the HomeScreen AppWidget reactively on change
+    LaunchedEffect(uiState.logs, uiState.config) {
+        val intent = Intent(context, MonitorWidgetProvider::class.java).apply {
+            action = MonitorWidgetProvider.ACTION_REFRESH_WIDGET
+        }
+        context.sendBroadcast(intent)
+    }
+
+    // 2. Track budget thresholds and post system notifications
+    var lastNotifiedRatio by rememberSaveable { mutableStateOf(-1f) }
+    LaunchedEffect(totalCost, budget) {
+        if (budget <= 0) return@LaunchedEffect
+        val ratio = (totalCost / budget).toFloat()
+        
+        // Skip first comparison if lastNotifiedRatio is uninitialized (-1) to avoid duplicate spam on start
+        if (lastNotifiedRatio < 0f) {
+            lastNotifiedRatio = ratio
+            return@LaunchedEffect
+        }
+
+        // Check milestone boundaries
+        if (ratio >= 1.0f && lastNotifiedRatio < 1.0f) {
+            BudgetNotificationHelper.showBudgetNotification(
+                context,
+                "Budget Exceeded! (100%)",
+                "Claude Code spending is at $${String.format("%.2f", totalCost)}, which exceeds your monthly budget of $${String.format("%.2f", budget)}."
+            )
+            lastNotifiedRatio = ratio
+        } else if (ratio >= 0.8f && lastNotifiedRatio < 0.8f) {
+            BudgetNotificationHelper.showBudgetNotification(
+                context,
+                "Critical Spending Warning! (80%)",
+                "Claude Code spending has reached $${String.format("%.2f", totalCost)} (80%+ of your limit $${String.format("%.2f", budget)})."
+            )
+            lastNotifiedRatio = ratio
+        } else if (ratio >= 0.5f && lastNotifiedRatio < 0.5f) {
+            BudgetNotificationHelper.showBudgetNotification(
+                context,
+                "Spending Milestone! (50%)",
+                "You have used 50% of your current monthly budget ($${String.format("%.2f", totalCost)} of $${String.format("%.2f", budget)})."
+            )
+            lastNotifiedRatio = ratio
+        } else if (ratio < 0.5f) {
+            // Reset when logs are cleared or budget limit increases
+            lastNotifiedRatio = ratio
+        }
+    }
 
     AnimatedContent(
         targetState = isUserLoggedIn,
@@ -292,6 +349,13 @@ fun DashboardView(uiState: MonitorUiState, viewModel: MonitorViewModel) {
             outputTokens = totalOutputTokens
         )
 
+        // Bento Budget Alert Banner (M3 Expressive UI)
+        BudgetAlertSection(
+            totalCost = totalCost,
+            budget = uiState.config.monthlyBudget,
+            onAdjustBudget = { viewModel.selectTab(3) }
+        )
+
         // Tokens Bento Grid Row (Side-by-side 1:1 ratio)
         TokensBentoGridRow(
             inputTokens = totalInputTokens,
@@ -433,6 +497,146 @@ fun OverviewHeroBanner(
                         text = "Remaining: " + String.format("$%.2f", (budget - totalCost).coerceAtLeast(0.0)),
                         fontSize = 11.sp,
                         color = if (totalCost >= budget) Color(0xFFDC2626) else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class AlertStyle(
+    val containerColor: Color,
+    val contentColor: Color,
+    val strokeColor: Color,
+    val title: String,
+    val message: String,
+    val icon: ImageVector
+)
+
+@Composable
+fun BudgetAlertSection(
+    totalCost: Double,
+    budget: Double,
+    onAdjustBudget: () -> Unit
+) {
+    if (budget <= 0) return
+    val ratio = totalCost / budget
+    if (ratio < 0.5) return // No alert if under 50%
+
+    var isDismissed by rememberSaveable(totalCost) { mutableStateOf(false) }
+    if (isDismissed) return
+
+    val style = when {
+        ratio >= 1.0 -> {
+            AlertStyle(
+                containerColor = Color(0xFF3F191B), // Deep dark red surface
+                contentColor = Color(0xFFFFDAD9), // Coral red text
+                strokeColor = Color(0xFFFFB4AB), // Red border
+                title = "Monthly Budget Exceeded!",
+                message = "Your developer queries have exceeded the monthly spending limit of $${String.format("%.2f", budget)}. Please optimize your prompt size or increase your budget limit.",
+                icon = Icons.Default.Error
+            )
+        }
+        ratio >= 0.8 -> {
+            AlertStyle(
+                containerColor = Color(0xFF331B00), // Deep dark amber
+                contentColor = Color(0xFFFFDDB3), // Peach orange text
+                strokeColor = Color(0xFFFFB951), // Amber border
+                title = "Approaching Budget Limit (80%+)",
+                message = "Claude Code spending is at $${String.format("%.2f", totalCost)} of your $${String.format("%.2f", budget)} limit. We suggest reducing large file indexes or optimizing test runs.",
+                icon = Icons.Default.Warning
+            )
+        }
+        else -> {
+            AlertStyle(
+                containerColor = Color(0xFF0F1E2A), // Dark slate blue
+                contentColor = Color(0xFFD0E4FF), // M3 Primary container style
+                strokeColor = Color(0xFF8BCEFF), // Accent blue border
+                title = "Spending Notice (50%+)",
+                message = "You've crossed 50% of your current monthly spending budget. Current cost is $${String.format("%.2f", totalCost)}.",
+                icon = Icons.Default.Info
+            )
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("budget_alert_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = style.containerColor,
+            contentColor = style.contentColor
+        ),
+        border = BorderStroke(1.5.dp, style.strokeColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = style.icon,
+                        contentDescription = "Alert icon",
+                        tint = style.strokeColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = style.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = style.contentColor
+                    )
+                }
+
+                // Close button to dismiss in-app alert
+                IconButton(
+                    onClick = { isDismissed = true },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss",
+                        tint = style.contentColor.copy(alpha = 0.6f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = style.message,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = style.contentColor.copy(alpha = 0.85f)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = onAdjustBudget,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = style.strokeColor
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = "Adjust Limit →",
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
