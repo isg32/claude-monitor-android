@@ -56,128 +56,142 @@ fun MonitorScreen(
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Terminal,
-                                contentDescription = "Logo",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Claude Monitor",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (uiState.config.isDemoMode) "Demo Mode Active" else "Live Key Connected",
-                                fontSize = 11.sp,
-                                color = if (uiState.config.isDemoMode) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    if (uiState.config.isDemoMode) {
-                        Button(
-                            onClick = { viewModel.selectTab(3) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                contentColor = MaterialTheme.colorScheme.primary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp).testTag("link_key_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.VpnKey,
-                                contentDescription = "Add Key",
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Connect Key", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        IconButton(onClick = { viewModel.selectTab(3) }) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                val tabs = listOf(
-                    Triple("Dashboard", Icons.Default.Dashboard, 0),
-                    Triple("CLI Run Log", Icons.Default.History, 1),
-                    Triple("Playground", Icons.Default.PlayArrow, 2),
-                    Triple("Settings", Icons.Default.Settings, 3)
-                )
+    val isUserLoggedIn = uiState.config.isDemoMode || uiState.config.apiKey.isNotEmpty()
 
-                tabs.forEach { (label, icon, index) ->
-                    NavigationBarItem(
-                        selected = uiState.activeTab == index,
-                        onClick = { viewModel.selectTab(index) },
-                        label = { Text(label, fontWeight = FontWeight.Bold, fontSize = 11.sp) },
-                        icon = { Icon(icon, contentDescription = label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        ),
-                        modifier = Modifier.testTag("nav_tab_$index")
+    AnimatedContent(
+        targetState = isUserLoggedIn,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+        },
+        label = "LoginTransition"
+    ) { loggedIn ->
+        if (!loggedIn) {
+            LoginView(uiState = uiState, viewModel = viewModel, focusManager = focusManager)
+        } else {
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Terminal,
+                                        contentDescription = "Logo",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Claude Monitor",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (uiState.config.isDemoMode) "Demo Mode Active" else "Live Key Connected",
+                                        fontSize = 11.sp,
+                                        color = if (uiState.config.isDemoMode) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            if (uiState.config.isDemoMode) {
+                                Button(
+                                    onClick = { viewModel.selectTab(3) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(34.dp).testTag("link_key_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.VpnKey,
+                                        contentDescription = "Add Key",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Connect Key", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.selectTab(3) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
                     )
-                }
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            AnimatedContent(
-                targetState = uiState.activeTab,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
                 },
-                label = "TabTransition"
-            ) { tabIndex ->
-                when (tabIndex) {
-                    0 -> DashboardView(uiState, viewModel)
-                    1 -> CliHistoryView(uiState, viewModel)
-                    2 -> PlaygroundView(uiState, viewModel, focusManager)
-                    3 -> SettingsView(uiState, viewModel, focusManager)
+                bottomBar = {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        val tabs = listOf(
+                            Triple("Dashboard", Icons.Default.Dashboard, 0),
+                            Triple("CLI Run Log", Icons.Default.History, 1),
+                            Triple("Playground", Icons.Default.PlayArrow, 2),
+                            Triple("Settings", Icons.Default.Settings, 3)
+                        )
+
+                        tabs.forEach { (label, icon, index) ->
+                            NavigationBarItem(
+                                selected = uiState.activeTab == index,
+                                onClick = { viewModel.selectTab(index) },
+                                label = { Text(label, fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                                icon = { Icon(icon, contentDescription = label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.testTag("nav_tab_$index")
+                            )
+                        }
+                    }
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    AnimatedContent(
+                        targetState = uiState.activeTab,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
+                        },
+                        label = "TabTransition"
+                    ) { tabIndex ->
+                        when (tabIndex) {
+                            0 -> DashboardView(uiState, viewModel)
+                            1 -> CliHistoryView(uiState, viewModel)
+                            2 -> PlaygroundView(uiState, viewModel, focusManager)
+                            3 -> SettingsView(uiState, viewModel, focusManager)
+                        }
+                    }
                 }
             }
         }
@@ -207,7 +221,7 @@ fun DashboardView(uiState: MonitorUiState, viewModel: MonitorViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Claude Code",
                     style = MaterialTheme.typography.headlineMedium.copy(
@@ -222,19 +236,50 @@ fun DashboardView(uiState: MonitorUiState, viewModel: MonitorViewModel) {
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondary),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "A",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
+                // Refresh Button
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(enabled = !uiState.isRefreshing) { viewModel.refreshData() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (uiState.isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh usage logs",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "A",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         }
 
@@ -1609,6 +1654,37 @@ fun SettingsView(
                 }
             }
         }
+
+        // Session Control Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Session Control",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Logout of the current monitoring workspace. This will clear key mappings and restrict background logging until authenticated again.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Button(
+                    onClick = { viewModel.logout() },
+                    modifier = Modifier.fillMaxWidth().testTag("logout_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Logout & Lock Workspace", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError)
+                }
+            }
+        }
     }
 }
 
@@ -1660,4 +1736,231 @@ fun getEndOfDay(timeMs: Long): Long {
     cal.set(Calendar.SECOND, 59)
     cal.set(Calendar.MILLISECOND, 999)
     return cal.timeInMillis
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginView(
+    uiState: MonitorUiState,
+    viewModel: MonitorViewModel,
+    focusManager: androidx.compose.ui.focus.FocusManager
+) {
+    var apiKeyInput by remember { mutableStateOf("") }
+    var budgetInput by remember { mutableStateOf("100.0") }
+    var keyVisible by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Bento Hero Logo Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.tertiary
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.tertiary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Terminal,
+                        contentDescription = "Console",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Claude Code",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-1).sp
+                        ),
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Text(
+                        text = "DEVELOPER UTILITY & COST MONITOR",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+        }
+
+        // Credentials Card (Bento Row)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Live Key Authentication",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = "Authenticate with your Anthropic key to track real queries, prompt/token outputs, and compute precise live billing summaries.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    lineHeight = 15.sp
+                )
+
+                OutlinedTextField(
+                    value = apiKeyInput,
+                    onValueChange = { apiKeyInput = it },
+                    modifier = Modifier.fillMaxWidth().testTag("login_key_input"),
+                    label = { Text("Anthropic API Key") },
+                    placeholder = { Text("sk-ant-...") },
+                    singleLine = true,
+                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { keyVisible = !keyVisible }) {
+                            Icon(
+                                imageVector = if (keyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle key visibility"
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
+                OutlinedTextField(
+                    value = budgetInput,
+                    onValueChange = { budgetInput = it },
+                    modifier = Modifier.fillMaxWidth().testTag("login_budget_input"),
+                    label = { Text("Monthly Budget Limit (USD)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
+                if (uiState.loginError != null) {
+                    Text(
+                        text = uiState.loginError ?: "",
+                        color = Color(0xFFDC2626),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 15.sp
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        val budgetDouble = budgetInput.toDoubleOrNull() ?: 100.0
+                        viewModel.logInWithKey(apiKeyInput, budgetDouble) {
+                            // On Success
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("login_verify_button"),
+                    enabled = apiKeyInput.trim().startsWith("sk-ant-") && !uiState.isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Connect & Verify Connection", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Demo Sandbox Mode Card (Secondary option)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Simulation Environment Sandbox",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "Don't have a key right now? Explore full dashboard metrics, logs, trend charts, and playground queries immediately with zero setup.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    lineHeight = 15.sp
+                )
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.enableDemoMode()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("login_demo_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Text("Explore Sandbox Mode", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
 }

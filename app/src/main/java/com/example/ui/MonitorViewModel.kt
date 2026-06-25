@@ -23,6 +23,7 @@ data class MonitorUiState(
     val config: ApiConfig = ApiConfig(),
     val isDbLoaded: Boolean = false,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val loginError: String? = null,
     val playgroundPrompt: String = "",
     val playgroundResponse: String = "",
@@ -51,8 +52,8 @@ class MonitorViewModel(private val repository: UsageRepository) : ViewModel() {
                 if (config != null) {
                     _uiState.update { it.copy(config = config, isDbLoaded = true) }
                 } else {
-                    // Initialize with default demo configuration
-                    val defaultConfig = ApiConfig(id = 1, apiKey = "", monthlyBudget = 100.0, isDemoMode = true)
+                    // Initialize with default empty configuration (not logged in yet)
+                    val defaultConfig = ApiConfig(id = 1, apiKey = "", monthlyBudget = 100.0, isDemoMode = false)
                     repository.saveApiConfig(defaultConfig)
                     _uiState.update { it.copy(config = defaultConfig, isDbLoaded = true) }
                 }
@@ -137,6 +138,50 @@ class MonitorViewModel(private val repository: UsageRepository) : ViewModel() {
             repository.saveApiConfig(current.copy(isDemoMode = true, apiKey = ""))
             _uiState.update { it.copy(loginError = null) }
             preloadMockData()
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.saveApiConfig(ApiConfig(id = 1, apiKey = "", monthlyBudget = 100.0, isDemoMode = false))
+            _uiState.update { it.copy(activeTab = 0, loginError = null, playgroundResponse = "", playgroundPrompt = "") }
+        }
+    }
+
+    fun refreshData() {
+        if (_uiState.value.isRefreshing) return
+        _uiState.update { it.copy(isRefreshing = true) }
+        viewModelScope.launch {
+            delay(1200) // Simulated synchronization delay
+            val config = _uiState.value.config
+            if (config.isDemoMode) {
+                // Generate simulated Claude Code developer logs
+                val mockCommands = listOf(
+                    "claude \"verify compilation and run roborazzi tests\"",
+                    "claude \"refactor details panel and add rich tooltips\"",
+                    "claude \"implement dynamic color scheme in bento grids\"",
+                    "claude \"write unit test suite for billing controller\"",
+                    "claude \"optimize SQL database queries with SQLite indexers\""
+                )
+                val mockModels = listOf(ModelPricing.CLAUDE_3_5_SONNET, ModelPricing.CLAUDE_3_5_HAIKU)
+                val command = mockCommands.random()
+                val model = mockModels.random()
+                val inputTokens = (4000..22000).random()
+                val outputTokens = (500..3800).random()
+                val cost = ModelPricing.calculateCost(model, inputTokens, outputTokens)
+
+                val log = UsageLog(
+                    commandName = command,
+                    timestamp = System.currentTimeMillis(),
+                    modelName = model,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    cost = cost,
+                    isPlaygroundQuery = false
+                )
+                repository.insertUsageLog(log)
+            }
+            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
