@@ -1,0 +1,6 @@
+{
+  "name": "Claude Monitor",
+  "description": "Log in to Claude Code and track your real-time API key usage, token consumption, and model costs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
